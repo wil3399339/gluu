@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Gluu - TikTok-like App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: auto;
+      padding: 20px;
+      background: #fafafa;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    textarea {
+      width: 100%;
+      padding: 8px;
+      font-size: 1em;
+      resize: vertical;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+    .post {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      background-color: #f9f9f9;
+    }
+    .viral {
+      background-color: #e0ffe0;
+    }
+    small {
+      color: #555;
+    }
+    #followers {
+      font-weight: bold;
+      margin-bottom: 15px;
+      text-align: center;
+      font-size: 1.2em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Gluu</h1>
+  <div id="followers">Followers: 0 / 100 (bots added daily)</div>
+
+  <form id="postForm">
+    <textarea id="postContent" rows="3" placeholder="What's on your mind?"></textarea>
+    <button type="submit">Post</button>
+  </form>
+
+  <h2>Your Posts</h2>
+  <div id="yourPosts">
+    <p>No posts yet.</p>
+  </div>
+
+  <h2>For You Page (Mostly Bots)</h2>
+  <div id="fypPosts"></div>
+
+<script>
+  const BOT_FOLLOWERS_PER_DAY = 100;
+  const VIRAL_CHANCE = 0.4;
+
+  const botVideos = [
+    { id: "b1", content: "Funny Cat Compilation", likes: 500, viral: false, date: "Bot video" },
+    { id: "b2", content: "Epic Dance Moves", likes: 1500, viral: false, date: "Bot video" },
+    { id: "b3", content: "Cooking Hacks", likes: 800, viral: false, date: "Bot video" },
+    { id: "b4", content: "Magic Tricks", likes: 1200, viral: false, date: "Bot video" },
+    { id: "b5", content: "Travel Vlog", likes: 1100, viral: false, date: "Bot video" },
+  ];
+
+  // Load data from localStorage or initialize
+  let followers = parseInt(localStorage.getItem("gluu_followers")) || 0;
+  let posts = JSON.parse(localStorage.getItem("gluu_posts")) || [];
+  let lastFollowerUpdate = localStorage.getItem("gluu_lastFollowerUpdate");
+  let fypVideos = JSON.parse(localStorage.getItem("gluu_fypVideos")) || botVideos;
+
+  // Save all data back to localStorage
+  function saveData() {
+    localStorage.setItem("gluu_followers", followers);
+    localStorage.setItem("gluu_posts", JSON.stringify(posts));
+    localStorage.setItem("gluu_fypVideos", JSON.stringify(fypVideos));
+    localStorage.setItem("gluu_lastFollowerUpdate", lastFollowerUpdate);
+  }
+
+  // Update followers display
+  function updateFollowersDisplay() {
+    document.getElementById("followers").textContent = `Followers: ${followers} / ${BOT_FOLLOWERS_PER_DAY} (bots added daily)`;
+  }
+
+  // Render posts in a container
+  function renderPosts(containerId, postsList, showDate=true) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = "";
+    if (postsList.length === 0) {
+      container.innerHTML = "<p>No posts yet.</p>";
+      return;
+    }
+    postsList.forEach(post => {
+      const postDiv = document.createElement("div");
+      postDiv.className = "post" + (post.viral ? " viral" : "");
+      postDiv.innerHTML = `
+        <p>${escapeHtml(post.content)}</p>
+        <small>Likes: ${post.likes} ${post.viral ? "🔥 Viral" : ""}<br/>
+        Posted: ${showDate ? post.date : "Bot video"}</small>
+      `;
+      container.appendChild(postDiv);
+    });
+  }
+
+  // Escape HTML to prevent injection
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.appendChild(document.createTextNode(text));
+    return div.innerHTML;
+  }
+
+  // Post submission handler
+  document.getElementById("postForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    const content = document.getElementById("postContent").value.trim();
+    if (!content) return;
+
+    // Viral logic
+    const isViral = Math.random() < VIRAL_CHANCE;
+    const likes = isViral
+      ? 10000 + Math.floor(Math.random() * 90000)
+      : Math.floor(Math.random() * 9999);
+
+    const newPost = {
+      id: "u" + (posts.length + 1),
+      content,
+      likes,
+      viral: isViral,
+      date: new Date().toLocaleString(),
+    };
+
+    posts.unshift(newPost);
+
+    // Add post to FYP (mostly bots)
+    if (isViral) {
+      fypVideos.unshift(newPost);
+    } else if (Math.random() < 0.1) {
+      fypVideos.unshift(newPost);
+    }
+
+    // Save & render
+    saveData();
+    renderPosts("yourPosts", posts);
+    renderPosts("fypPosts", fypVideos, false);
+
+    // Clear textarea
+    document.getElementById("postContent").value = "";
+  });
+
+  // Add bot followers gradually over the day
+  function updateFollowers() {
+    const now = Date.now();
+    if (!lastFollowerUpdate) {
+      lastFollowerUpdate = now;
+      saveData();
+      return;
+    }
+    // Calculate how many followers to add since last update (bots spread evenly over 24h)
+    const msPerFollower = 24 * 60 * 60 * 1000 / BOT_FOLLOWERS_PER_DAY;
+    let newFollowers = Math.floor((now - lastFollowerUpdate) / msPerFollower);
+
+    if (newFollowers > 0) {
+      followers += newFollowers;
+      if (followers > BOT_FOLLOWERS_PER_DAY) followers = BOT_FOLLOWERS_PER_DAY;
+      lastFollowerUpdate += newFollowers * msPerFollower;
+      saveData();
+      updateFollowersDisplay();
+    }
+  }
+
+  // Initial render
+  updateFollowersDisplay();
+  renderPosts("yourPosts", posts);
+  renderPosts("fypPosts", fypVideos, false);
+
+  // Check follower update every minute
+  setInterval(updateFollowers, 60 * 1000);
+  updateFollowers(); // also update immediately on load
+</script>
+
+</body>
+</html>
