@@ -1,194 +1,408 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" >
 <head>
   <meta charset="UTF-8" />
-  <title>Gluu - TikTok-like App</title>
+  <title>Gluu - TikTok-like Web App</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
       font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: auto;
-      padding: 20px;
+      max-width: 640px;
+      margin: 0 auto;
       background: #fafafa;
+      color: #222;
+      padding: 0 10px 50px;
     }
-    h1, h2 {
-      text-align: center;
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 0;
+      border-bottom: 1px solid #ddd;
+    }
+    h1 {
+      margin: 0;
+      font-weight: 700;
+      font-size: 1.8rem;
+      color: #e03131;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    button {
+      background-color: #e03131;
+      border: none;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 1rem;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: default;
+    }
+    .hidden {
+      display: none;
+    }
+    #loginForm, #profilePage, #appPage {
+      margin-top: 20px;
+    }
+    input[type=text] {
+      padding: 10px;
+      width: 100%;
+      font-size: 1rem;
+      margin-bottom: 10px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
     }
     textarea {
       width: 100%;
-      padding: 8px;
-      font-size: 1em;
+      min-height: 80px;
       resize: vertical;
+      padding: 10px;
+      font-size: 1rem;
       margin-bottom: 10px;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 1em;
-      cursor: pointer;
-    }
-    .post {
+      border-radius: 4px;
       border: 1px solid #ccc;
+    }
+    .posts, .fyp {
+      margin-top: 15px;
+    }
+    .post, .fyp-post {
+      background: white;
       border-radius: 8px;
       padding: 12px;
-      margin-bottom: 12px;
-      background-color: #f9f9f9;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
-    .viral {
-      background-color: #e0ffe0;
+    .post.viral, .fyp-post.viral {
+      border: 2px solid #e03131;
+      background: #ffe6e6;
+    }
+    video {
+      width: 100%;
+      border-radius: 8px;
+      margin-bottom: 8px;
     }
     small {
       color: #555;
     }
-    #followers {
-      font-weight: bold;
-      margin-bottom: 15px;
+    #followersCount {
+      font-weight: 700;
+      font-size: 1.1rem;
+      margin-bottom: 10px;
       text-align: center;
-      font-size: 1.2em;
+    }
+    #userGreeting {
+      font-weight: 600;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    #postVideoUrl {
+      font-size: 0.9rem;
     }
   </style>
 </head>
 <body>
+
+<header>
   <h1>Gluu</h1>
-  <div id="followers">Followers: 0 / 100 (bots added daily)</div>
+  <button id="logoutBtn" class="hidden">Logout</button>
+</header>
+
+<!-- Login -->
+<div id="loginForm">
+  <h2>Login / Create Profile</h2>
+  <input type="text" id="usernameInput" placeholder="Enter your username" autocomplete="off" />
+  <button id="loginBtn" disabled>Enter Gluu</button>
+  <small style="display:block; margin-top:8px; color:#888;">No password needed. Profile saved locally.</small>
+</div>
+
+<!-- Profile + Posting -->
+<div id="appPage" class="hidden">
+  <div id="userGreeting"></div>
+  <div id="followersCount">Followers: 0</div>
 
   <form id="postForm">
-    <textarea id="postContent" rows="3" placeholder="What's on your mind?"></textarea>
-    <button type="submit">Post</button>
+    <label for="postVideoUrl">Post a video URL (or leave empty for random bot video):</label>
+    <input type="text" id="postVideoUrl" placeholder="Paste video URL here" />
+    <button type="submit">Post Video</button>
   </form>
 
   <h2>Your Posts</h2>
-  <div id="yourPosts">
+  <div id="userPosts" class="posts">
     <p>No posts yet.</p>
   </div>
 
-  <h2>For You Page (Mostly Bots)</h2>
-  <div id="fypPosts"></div>
+  <h2>For You Page</h2>
+  <div id="fypPosts" class="fyp"></div>
+</div>
 
 <script>
-  const BOT_FOLLOWERS_PER_DAY = 100;
+  // Constants
   const VIRAL_CHANCE = 0.4;
-
-  const botVideos = [
-    { id: "b1", content: "Funny Cat Compilation", likes: 500, viral: false, date: "Bot video" },
-    { id: "b2", content: "Epic Dance Moves", likes: 1500, viral: false, date: "Bot video" },
-    { id: "b3", content: "Cooking Hacks", likes: 800, viral: false, date: "Bot video" },
-    { id: "b4", content: "Magic Tricks", likes: 1200, viral: false, date: "Bot video" },
-    { id: "b5", content: "Travel Vlog", likes: 1100, viral: false, date: "Bot video" },
+  const BOT_FOLLOWERS_PER_DAY = 100;
+  const MS_PER_FOLLOWER = 24 * 60 * 60 * 1000 / BOT_FOLLOWERS_PER_DAY;
+  const BOT_VIDEOS = [
+    { id: "bot1", url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm", title: "Beautiful Flower" },
+    { id: "bot2", url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/bee.webm", title: "Busy Bee" },
+    { id: "bot3", url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/turtle.webm", title: "Slow Turtle" },
+    { id: "bot4", url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/earth.webm", title: "Our Earth" },
+    { id: "bot5", url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/forest.webm", title: "Calm Forest" },
   ];
 
-  // Load data from localStorage or initialize
-  let followers = parseInt(localStorage.getItem("gluu_followers")) || 0;
-  let posts = JSON.parse(localStorage.getItem("gluu_posts")) || [];
-  let lastFollowerUpdate = localStorage.getItem("gluu_lastFollowerUpdate");
-  let fypVideos = JSON.parse(localStorage.getItem("gluu_fypVideos")) || botVideos;
+  // UI elements
+  const loginForm = document.getElementById("loginForm");
+  const usernameInput = document.getElementById("usernameInput");
+  const loginBtn = document.getElementById("loginBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
 
-  // Save all data back to localStorage
-  function saveData() {
-    localStorage.setItem("gluu_followers", followers);
-    localStorage.setItem("gluu_posts", JSON.stringify(posts));
-    localStorage.setItem("gluu_fypVideos", JSON.stringify(fypVideos));
-    localStorage.setItem("gluu_lastFollowerUpdate", lastFollowerUpdate);
+  const appPage = document.getElementById("appPage");
+  const userGreeting = document.getElementById("userGreeting");
+  const followersCount = document.getElementById("followersCount");
+  const postForm = document.getElementById("postForm");
+  const postVideoUrl = document.getElementById("postVideoUrl");
+  const userPostsDiv = document.getElementById("userPosts");
+  const fypPostsDiv = document.getElementById("fypPosts");
+
+  // Current user data structure:
+  // {
+  //   username: string,
+  //   followers: number,
+  //   posts: array of posts,
+  //   lastFollowerUpdate: timestamp
+  // }
+  // Post structure:
+  // {
+  //   id: string,
+  //   url: string,
+  //   likes: number,
+  //   viral: bool,
+  //   date: string,
+  //   owner: username
+  // }
+
+  let currentUser = null;
+
+  // Enable login button only if username not empty
+  usernameInput.addEventListener("input", () => {
+    loginBtn.disabled = usernameInput.value.trim().length === 0;
+  });
+
+  // Login or create profile
+  loginBtn.addEventListener("click", () => {
+    const username = usernameInput.value.trim();
+    if (!username) return;
+
+    currentUser = loadUser(username);
+    loginForm.classList.add("hidden");
+    appPage.classList.remove("hidden");
+    logoutBtn.classList.remove("hidden");
+    usernameInput.value = "";
+
+    updateUI();
+    startFollowerAutoIncrement();
+  });
+
+  logoutBtn.addEventListener("click", () => {
+    currentUser = null;
+    loginForm.classList.remove("hidden");
+    appPage.classList.add("hidden");
+    logoutBtn.classList.add("hidden");
+    userPostsDiv.innerHTML = "";
+    fypPostsDiv.innerHTML = "";
+    followersCount.textContent = "Followers: 0";
+    clearInterval(followerInterval);
+  });
+
+  // Load user profile or create new
+  function loadUser(username) {
+    const key = `gluu_user_${username.toLowerCase()}`;
+    const data = localStorage.getItem(key);
+    if (data) {
+      return JSON.parse(data);
+    } else {
+      // New user profile
+      return {
+        username,
+        followers: 0,
+        posts: [],
+        lastFollowerUpdate: Date.now(),
+      };
+    }
   }
 
-  // Update followers display
-  function updateFollowersDisplay() {
-    document.getElementById("followers").textContent = `Followers: ${followers} / ${BOT_FOLLOWERS_PER_DAY} (bots added daily)`;
+  // Save current user to localStorage
+  function saveUser() {
+    if (!currentUser) return;
+    const key = `gluu_user_${currentUser.username.toLowerCase()}`;
+    localStorage.setItem(key, JSON.stringify(currentUser));
   }
 
-  // Render posts in a container
-  function renderPosts(containerId, postsList, showDate=true) {
-    const container = document.getElementById(containerId);
-    container.innerHTML = "";
-    if (postsList.length === 0) {
-      container.innerHTML = "<p>No posts yet.</p>";
+  // Update followers gradually (bots silently)
+  function updateFollowers() {
+    if (!currentUser) return;
+
+    const now = Date.now();
+    let diff = now - currentUser.lastFollowerUpdate;
+    if (diff < MS_PER_FOLLOWER) return;
+
+    let followersToAdd = Math.floor(diff / MS_PER_FOLLOWER);
+    currentUser.followers += followersToAdd;
+    currentUser.lastFollowerUpdate += followersToAdd * MS_PER_FOLLOWER;
+
+    saveUser();
+    updateUI();
+  }
+
+  let followerInterval = null;
+  function startFollowerAutoIncrement() {
+    if (followerInterval) clearInterval(followerInterval);
+    updateFollowers();
+    followerInterval = setInterval(updateFollowers, 60 * 1000);
+  }
+
+  // Post a video (user can add URL or random bot video)
+  postForm.addEventListener("submit", e => {
+    e.preventDefault();
+    if (!currentUser) return;
+
+    let url = postVideoUrl.value.trim();
+    if (!url) {
+      // Pick random bot video URL for user post
+      const randomBot = BOT_VIDEOS[Math.floor(Math.random() * BOT_VIDEOS.length)];
+      url = randomBot.url;
+    }
+
+    // Determine viral chance
+    const viral = Math.random() < VIRAL_CHANCE;
+    const likes = viral ? 10000 + Math.floor(Math.random() * 90000) : Math.floor(Math.random() * 9999);
+
+    const post = {
+      id: currentUser.username + "_" + Date.now(),
+      url,
+      likes,
+      viral,
+      date: new Date().toLocaleString(),
+      owner: currentUser.username,
+    };
+
+    currentUser.posts.unshift(post);
+    saveUser();
+
+    postVideoUrl.value = "";
+    updateUI();
+  });
+
+  // Render user's posts
+  function renderUserPosts() {
+    userPostsDiv.innerHTML = "";
+    if (currentUser.posts.length === 0) {
+      userPostsDiv.innerHTML = "<p>No posts yet.</p>";
       return;
     }
-    postsList.forEach(post => {
-      const postDiv = document.createElement("div");
-      postDiv.className = "post" + (post.viral ? " viral" : "");
-      postDiv.innerHTML = `
-        <p>${escapeHtml(post.content)}</p>
-        <small>Likes: ${post.likes} ${post.viral ? "🔥 Viral" : ""}<br/>
-        Posted: ${showDate ? post.date : "Bot video"}</small>
-      `;
-      container.appendChild(postDiv);
+    currentUser.posts.forEach(post => {
+      userPostsDiv.appendChild(createPostElement(post, true));
     });
   }
 
-  // Escape HTML to prevent injection
-  function escapeHtml(text) {
+  // Render For You Page (mostly bot posts + viral user posts)
+  function renderFYP() {
+    fypPostsDiv.innerHTML = "";
+
+    // Bot posts with some metadata
+    const botPosts = BOT_VIDEOS.map(bot => ({
+      id: bot.id,
+      url: bot.url,
+      likes: 1000 + Math.floor(Math.random() * 2000),
+      viral: false,
+      date: "Bot video",
+      owner: "bot",
+      title: bot.title,
+    }));
+
+    // Take user's viral posts only
+    const viralUserPosts = currentUser.posts.filter(p => p.viral);
+
+    // Combine viral user posts and bot posts, user viral posts prioritized first
+    const combined = [...viralUserPosts, ...botPosts];
+
+    combined.forEach(post => {
+      fypPostsDiv.appendChild(createPostElement(post, false));
+    });
+  }
+
+  // Create post DOM element
+  function createPostElement(post, showOwner) {
     const div = document.createElement("div");
-    div.appendChild(document.createTextNode(text));
-    return div.innerHTML;
+    div.className = "post" + (post.viral ? " viral" : "") + (showOwner ? " user-post" : " fyp-post");
+    div.style.cursor = "pointer";
+
+    const video = document.createElement("video");
+    video.src = post.url;
+    video.controls = true;
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+
+    const likesInfo = document.createElement("small");
+    likesInfo.textContent = `Likes: ${post.likes.toLocaleString()}${post.viral ? " 🔥 Viral" : ""}`;
+
+    const dateInfo = document.createElement("small");
+    dateInfo.style.display = "block";
+    dateInfo.style.marginTop = "4px";
+    dateInfo.style.color = "#666";
+
+    dateInfo.textContent = post.date;
+
+    const ownerInfo = document.createElement("small");
+    if (showOwner && post.owner) {
+      ownerInfo.style.display = "block";
+      ownerInfo.style.color = "#666";
+      ownerInfo.textContent = `Posted by: ${post.owner}`;
+    }
+
+    div.appendChild(video);
+    div.appendChild(likesInfo);
+    div.appendChild(dateInfo);
+    if (showOwner) div.appendChild(ownerInfo);
+
+    return div;
   }
 
-  // Post submission handler
-  document.getElementById("postForm").addEventListener("submit", function(e){
-    e.preventDefault();
-    const content = document.getElementById("postContent").value.trim();
-    if (!content) return;
+  // Update all UI elements
+  function updateUI() {
+    if (!currentUser) return;
+    userGreeting.textContent = `Welcome, ${currentUser.username}!`;
+    followersCount.textContent = `Followers: ${currentUser.followers.toLocaleString()}`;
 
-    // Viral logic
-    const isViral = Math.random() < VIRAL_CHANCE;
-    const likes = isViral
-      ? 10000 + Math.floor(Math.random() * 90000)
-      : Math.floor(Math.random() * 9999);
-
-    const newPost = {
-      id: "u" + (posts.length + 1),
-      content,
-      likes,
-      viral: isViral,
-      date: new Date().toLocaleString(),
-    };
-
-    posts.unshift(newPost);
-
-    // Add post to FYP (mostly bots)
-    if (isViral) {
-      fypVideos.unshift(newPost);
-    } else if (Math.random() < 0.1) {
-      fypVideos.unshift(newPost);
-    }
-
-    // Save & render
-    saveData();
-    renderPosts("yourPosts", posts);
-    renderPosts("fypPosts", fypVideos, false);
-
-    // Clear textarea
-    document.getElementById("postContent").value = "";
-  });
-
-  // Add bot followers gradually over the day
-  function updateFollowers() {
-    const now = Date.now();
-    if (!lastFollowerUpdate) {
-      lastFollowerUpdate = now;
-      saveData();
-      return;
-    }
-    // Calculate how many followers to add since last update (bots spread evenly over 24h)
-    const msPerFollower = 24 * 60 * 60 * 1000 / BOT_FOLLOWERS_PER_DAY;
-    let newFollowers = Math.floor((now - lastFollowerUpdate) / msPerFollower);
-
-    if (newFollowers > 0) {
-      followers += newFollowers;
-      if (followers > BOT_FOLLOWERS_PER_DAY) followers = BOT_FOLLOWERS_PER_DAY;
-      lastFollowerUpdate += newFollowers * msPerFollower;
-      saveData();
-      updateFollowersDisplay();
-    }
+    renderUserPosts();
+    renderFYP();
   }
 
-  // Initial render
-  updateFollowersDisplay();
-  renderPosts("yourPosts", posts);
-  renderPosts("fypPosts", fypVideos, false);
+  // On page load: check if user is saved in localStorage (auto-login)
+  window.onload = () => {
+    const keys = Object.keys(localStorage);
+    for (const key of keys) {
+      if (key.startsWith("gluu_user_")) {
+        // Load the first user found
+        const userData = JSON.parse(localStorage.getItem(key));
+        if (userData) {
+          currentUser = userData;
+          loginForm.classList.add("hidden");
+          appPage.classList.remove("hidden");
+          logoutBtn.classList.remove("hidden");
+          updateUI();
+          startFollowerAutoIncrement();
+          break;
+        }
+      }
+    }
+  };
 
-  // Check follower update every minute
-  setInterval(updateFollowers, 60 * 1000);
-  updateFollowers(); // also update immediately on load
 </script>
 
 </body>
