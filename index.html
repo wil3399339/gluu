@@ -2,7 +2,7 @@
 <html lang="en" >
 <head>
   <meta charset="UTF-8" />
-  <title>Gluu - TikTok-like Web App</title>
+  <title>Gluu - TikTok-like Web App with Live</title>
   <style>
     * {
       box-sizing: border-box;
@@ -46,10 +46,10 @@
     .hidden {
       display: none;
     }
-    #loginForm, #profilePage, #appPage {
+    #loginForm, #appPage, #livePage {
       margin-top: 20px;
     }
-    input[type=text] {
+    input[type=text], textarea {
       padding: 10px;
       width: 100%;
       font-size: 1rem;
@@ -58,14 +58,8 @@
       border: 1px solid #ccc;
     }
     textarea {
-      width: 100%;
-      min-height: 80px;
       resize: vertical;
-      padding: 10px;
-      font-size: 1rem;
-      margin-bottom: 10px;
-      border-radius: 4px;
-      border: 1px solid #ccc;
+      min-height: 60px;
     }
     .posts, .fyp {
       margin-top: 15px;
@@ -103,6 +97,90 @@
     #postVideoUrl {
       font-size: 0.9rem;
     }
+    nav {
+      margin: 15px 0;
+      text-align: center;
+    }
+    nav button {
+      margin: 0 5px;
+    }
+    /* Live page styles */
+    #livePage {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    #liveVideoContainer {
+      background: black;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      height: 360px;
+    }
+    #liveVideoContainer video {
+      height: 100%;
+      width: 100%;
+      object-fit: cover;
+      filter: brightness(0.7);
+    }
+    #liveOverlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-weight: 700;
+      background-color: rgba(224,49,49,0.8);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #viewersCount {
+      font-weight: 700;
+      margin-top: 4px;
+      color: #e03131;
+      text-align: center;
+    }
+    #chatContainer {
+      background: white;
+      border-radius: 8px;
+      height: 300px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    #chatMessages {
+      flex-grow: 1;
+      padding: 10px;
+      overflow-y: auto;
+      font-size: 0.9rem;
+      font-family: monospace;
+      color: #333;
+    }
+    #chatInputContainer {
+      display: flex;
+      border-top: 1px solid #ddd;
+    }
+    #chatInput {
+      flex-grow: 1;
+      padding: 10px;
+      border: none;
+      font-size: 1rem;
+      border-radius: 0 0 0 8px;
+      outline: none;
+    }
+    #sendChatBtn {
+      background-color: #e03131;
+      border: none;
+      color: white;
+      padding: 10px 16px;
+      cursor: pointer;
+      border-radius: 0 0 8px 0;
+      font-weight: 600;
+    }
+    #sendChatBtn:disabled {
+      background-color: #ccc;
+      cursor: default;
+    }
   </style>
 </head>
 <body>
@@ -120,24 +198,48 @@
   <small style="display:block; margin-top:8px; color:#888;">No password needed. Profile saved locally.</small>
 </div>
 
-<!-- Profile + Posting -->
+<!-- Main app -->
 <div id="appPage" class="hidden">
-  <div id="userGreeting"></div>
-  <div id="followersCount">Followers: 0</div>
+  <nav>
+    <button id="btnHome">Home</button>
+    <button id="btnLive">Go Live</button>
+  </nav>
 
-  <form id="postForm">
-    <label for="postVideoUrl">Post a video URL (or leave empty for random bot video):</label>
-    <input type="text" id="postVideoUrl" placeholder="Paste video URL here" />
-    <button type="submit">Post Video</button>
-  </form>
+  <div id="homePage">
+    <div id="userGreeting"></div>
+    <div id="followersCount">Followers: 0</div>
 
-  <h2>Your Posts</h2>
-  <div id="userPosts" class="posts">
-    <p>No posts yet.</p>
+    <form id="postForm">
+      <label for="postVideoUrl">Post a video URL (or leave empty for random bot video):</label>
+      <input type="text" id="postVideoUrl" placeholder="Paste video URL here" />
+      <button type="submit">Post Video</button>
+    </form>
+
+    <h2>Your Posts</h2>
+    <div id="userPosts" class="posts">
+      <p>No posts yet.</p>
+    </div>
+
+    <h2>For You Page</h2>
+    <div id="fypPosts" class="fyp"></div>
   </div>
 
-  <h2>For You Page</h2>
-  <div id="fypPosts" class="fyp"></div>
+  <!-- Live streaming page -->
+  <div id="livePage" class="hidden">
+    <button id="endLiveBtn" style="margin-bottom:10px; background:#555;">End Live</button>
+    <div id="liveVideoContainer">
+      <video id="liveVideo" src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm" autoplay muted loop playsinline></video>
+      <div id="liveOverlay">LIVE</div>
+    </div>
+    <div id="viewersCount">Viewers: 0</div>
+    <div id="chatContainer">
+      <div id="chatMessages"></div>
+      <div id="chatInputContainer">
+        <input type="text" id="chatInput" placeholder="Type a message..." autocomplete="off" />
+        <button id="sendChatBtn" disabled>Send</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -151,6 +253,22 @@
     { id: "bot3", url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/turtle.webm", title: "Slow Turtle" },
     { id: "bot4", url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/earth.webm", title: "Our Earth" },
     { id: "bot5", url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/forest.webm", title: "Calm Forest" },
+  ];
+
+  const MAX_LIVE_VIEWERS = 300;
+  const BOT_CHAT_MESSAGES = [
+    "This is awesome!",
+    "Love this!",
+    "Keep it up!",
+    "Haha so funny 😂",
+    "Where are you from?",
+    "Nice moves!",
+    "Wow, impressive!",
+    "Can you do a dance?",
+    "🔥🔥🔥",
+    "So cool!",
+    "Hello from the bots!",
+    "Best live ever!",
   ];
 
   // UI elements
@@ -167,24 +285,26 @@
   const userPostsDiv = document.getElementById("userPosts");
   const fypPostsDiv = document.getElementById("fypPosts");
 
-  // Current user data structure:
-  // {
-  //   username: string,
-  //   followers: number,
-  //   posts: array of posts,
-  //   lastFollowerUpdate: timestamp
-  // }
-  // Post structure:
-  // {
-  //   id: string,
-  //   url: string,
-  //   likes: number,
-  //   viral: bool,
-  //   date: string,
-  //   owner: username
-  // }
+  // Navigation buttons
+  const btnHome = document.getElementById("btnHome");
+  const btnLive = document.getElementById("btnLive");
+
+  // Live page elements
+  const livePage = document.getElementById("livePage");
+  const homePage = document.getElementById("homePage");
+  const endLiveBtn = document.getElementById("endLiveBtn");
+  const liveVideo = document.getElementById("liveVideo");
+  const viewersCount = document.getElementById("viewersCount");
+  const chatMessages = document.getElementById("chatMessages");
+  const chatInput = document.getElementById("chatInput");
+  const sendChatBtn = document.getElementById("sendChatBtn");
 
   let currentUser = null;
+
+  // For live chat simulation
+  let liveActive = false;
+  let liveViewers = 0;
+  let botChatInterval = null;
 
   // Enable login button only if username not empty
   usernameInput.addEventListener("input", () => {
@@ -215,6 +335,7 @@
     fypPostsDiv.innerHTML = "";
     followersCount.textContent = "Followers: 0";
     clearInterval(followerInterval);
+    stopLive();
   });
 
   // Load user profile or create new
@@ -354,55 +475,154 @@
     const dateInfo = document.createElement("small");
     dateInfo.style.display = "block";
     dateInfo.style.marginTop = "4px";
-    dateInfo.style.color = "#666";
-
-    dateInfo.textContent = post.date;
-
-    const ownerInfo = document.createElement("small");
-    if (showOwner && post.owner) {
-      ownerInfo.style.display = "block";
-      ownerInfo.style.color = "#666";
-      ownerInfo.textContent = `Posted by: ${post.owner}`;
-    }
+    dateInfo.textContent = `Date: ${post.date}`;
 
     div.appendChild(video);
     div.appendChild(likesInfo);
     div.appendChild(dateInfo);
-    if (showOwner) div.appendChild(ownerInfo);
+
+    if (showOwner) {
+      const ownerInfo = document.createElement("small");
+      ownerInfo.style.display = "block";
+      ownerInfo.style.marginTop = "4px";
+      ownerInfo.textContent = `Posted by: ${post.owner}`;
+      div.appendChild(ownerInfo);
+    } else if (post.owner === "bot" && post.title) {
+      const botTitle = document.createElement("small");
+      botTitle.style.display = "block";
+      botTitle.style.marginTop = "4px";
+      botTitle.style.fontWeight = "600";
+      botTitle.textContent = post.title;
+      div.appendChild(botTitle);
+    }
+
+    // Clicking video plays or pauses
+    video.addEventListener("click", () => {
+      if (video.paused) video.play();
+      else video.pause();
+    });
 
     return div;
   }
 
-  // Update all UI elements
+  // Update UI with current user data
   function updateUI() {
     if (!currentUser) return;
-    userGreeting.textContent = `Welcome, ${currentUser.username}!`;
+
+    userGreeting.textContent = `Hello, ${currentUser.username}!`;
     followersCount.textContent = `Followers: ${currentUser.followers.toLocaleString()}`;
 
     renderUserPosts();
     renderFYP();
   }
 
-  // On page load: check if user is saved in localStorage (auto-login)
-  window.onload = () => {
-    const keys = Object.keys(localStorage);
-    for (const key of keys) {
-      if (key.startsWith("gluu_user_")) {
-        // Load the first user found
-        const userData = JSON.parse(localStorage.getItem(key));
-        if (userData) {
-          currentUser = userData;
-          loginForm.classList.add("hidden");
-          appPage.classList.remove("hidden");
-          logoutBtn.classList.remove("hidden");
-          updateUI();
-          startFollowerAutoIncrement();
-          break;
-        }
-      }
-    }
-  };
+  // Navigation buttons
+  btnHome.addEventListener("click", () => {
+    homePage.classList.remove("hidden");
+    livePage.classList.add("hidden");
+    stopLive();
+  });
+  btnLive.addEventListener("click", () => {
+    if (!currentUser) return;
+    startLive();
+    homePage.classList.add("hidden");
+    livePage.classList.remove("hidden");
+  });
 
+  // --- LIVE STREAMING feature ---
+
+  // Start live streaming
+  function startLive() {
+    if (liveActive) return;
+
+    liveActive = true;
+    liveViewers = 0;
+    viewersCount.textContent = `Viewers: 0`;
+
+    chatMessages.innerHTML = "";
+    chatInput.value = "";
+    chatInput.disabled = false;
+    sendChatBtn.disabled = true;
+
+    // Simulate bots joining live gradually up to 300
+    const joinInterval = setInterval(() => {
+      if (liveViewers >= MAX_LIVE_VIEWERS) {
+        clearInterval(joinInterval);
+        return;
+      }
+      liveViewers += Math.floor(Math.random() * 8) + 3; // 3-10 bots join per tick
+      if (liveViewers > MAX_LIVE_VIEWERS) liveViewers = MAX_LIVE_VIEWERS;
+      viewersCount.textContent = `Viewers: ${liveViewers.toLocaleString()}`;
+    }, 2000);
+
+    // Start bot chat interval
+    botChatInterval = setInterval(() => {
+      if (!liveActive) return;
+
+      if (liveViewers === 0) return;
+
+      // Random chance to send bot chat message
+      if (Math.random() < 0.6) {
+        const botMsg = BOT_CHAT_MESSAGES[Math.floor(Math.random() * BOT_CHAT_MESSAGES.length)];
+        addChatMessage("Bot", botMsg);
+      }
+    }, 3000 + Math.random() * 4000); // every 3-7 sec
+
+  }
+
+  // Stop live
+  function stopLive() {
+    if (!liveActive) return;
+
+    liveActive = false;
+    liveViewers = 0;
+    viewersCount.textContent = `Viewers: 0`;
+    chatMessages.innerHTML = "";
+    chatInput.value = "";
+    chatInput.disabled = true;
+    sendChatBtn.disabled = true;
+
+    if (botChatInterval) clearInterval(botChatInterval);
+  }
+
+  // End live button
+  endLiveBtn.addEventListener("click", () => {
+    stopLive();
+    homePage.classList.remove("hidden");
+    livePage.classList.add("hidden");
+  });
+
+  // Chat input and send
+  chatInput.addEventListener("input", () => {
+    sendChatBtn.disabled = chatInput.value.trim().length === 0;
+  });
+
+  sendChatBtn.addEventListener("click", () => {
+    const msg = chatInput.value.trim();
+    if (!msg) return;
+
+    addChatMessage(currentUser.username, msg);
+    chatInput.value = "";
+    sendChatBtn.disabled = true;
+  });
+
+  // Add chat message to chat box
+  function addChatMessage(sender, message) {
+    const div = document.createElement("div");
+    div.textContent = `${sender}: ${message}`;
+    div.style.padding = "2px 4px";
+
+    if (sender === currentUser.username) {
+      div.style.fontWeight = "700";
+      div.style.color = "#e03131";
+    } else if (sender === "Bot") {
+      div.style.fontStyle = "italic";
+      div.style.color = "#666";
+    }
+
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
 </script>
 
 </body>
